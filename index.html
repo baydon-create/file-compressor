@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Muhra Media Compressor</title>
+<meta name="description" content="Bulk image and video compression for Shopify. Runs entirely on your device.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236B2D5C'/%3E%3Cpath d='M9 22V10l7 7 7-7v12' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F1EFF3; --surface:#FFFFFF; --surface-2:#F7F5F8; --ink:#231C27; --muted:#6E6574; --line:#DED7E2;
+  --accent:#6B2D5C; --accent-ink:#FFFFFF; --accent-soft:#F2E7EF;
+  --ok:#2F6F4E; --ok-soft:#E3F0E8; --warn:#8F5600; --warn-soft:#FBEFD9; --bad:#A8323F; --bad-soft:#F8E1E4;
+  --r-lg:14px; --r-md:10px; --r-sm:7px;
+  --font:"IBM Plex Sans Arabic", system-ui, -apple-system, "Segoe UI", Tahoma, Arial, sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#16121A; --surface:#211B26; --surface-2:#2A2330; --ink:#EFE9F2; --muted:#A99FB0; --line:#3B3242;
+    --accent:#CE92BC; --accent-ink:#1B1220; --accent-soft:#3A2636;
+    --ok:#7CC39B; --ok-soft:#1F3328; --warn:#E5B35F; --warn-soft:#3A2D16; --bad:#F08B96; --bad-soft:#3D1F24;
+    color-scheme:dark;
+  }
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;height:auto}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+[hidden]{display:none!important}
+
+/* Header */
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 24px;max-width:1440px;margin:0 auto}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.brand svg{flex:none}
+.brand h1{font-size:19px;font-weight:600;margin:0;letter-spacing:-.01em}
+.brand p{margin:0;color:var(--muted);font-size:13.5px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line);background:var(--surface);
+  border-radius:var(--r-md);padding:9px 15px;cursor:pointer;font-weight:500;white-space:nowrap;min-height:40px}
+.btn:hover{border-color:var(--muted)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent}
+.btn.small{padding:5px 10px;min-height:32px;font-size:13.5px;border-radius:var(--r-sm)}
+.icon-btn{border:0;background:transparent;border-radius:var(--r-sm);width:32px;height:32px;display:inline-grid;place-items:center;cursor:pointer;color:var(--muted)}
+.icon-btn:hover{background:var(--surface-2);color:var(--ink)}
+
+/* Notices */
+.notices{max-width:1440px;margin:0 auto;padding:0 24px}
+.notice{border-radius:var(--r-md);padding:12px 16px;margin-bottom:12px;font-size:14px;border:1px solid transparent}
+.notice.warn{background:var(--warn-soft);color:var(--warn);border-color:color-mix(in srgb,var(--warn) 25%,transparent)}
+.notice.bad{background:var(--bad-soft);color:var(--bad)}
+
+/* Layout */
+.layout{display:grid;grid-template-columns:380px minmax(0,1fr);gap:20px;max-width:1440px;margin:0 auto;padding:0 24px 40px;align-items:start}
+@media (max-width:980px){.layout{grid-template-columns:1fr}}
+
+/* Settings panel */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);position:sticky;top:16px;max-height:calc(100vh - 32px);display:flex;flex-direction:column;overflow:hidden}
+@media (max-width:980px){.panel{position:static;max-height:none}}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:6px;border-bottom:1px solid var(--line);background:var(--surface-2)}
+.tab{border:0;background:transparent;border-radius:var(--r-sm);padding:8px 6px;cursor:pointer;font-weight:500;color:var(--muted)}
+.tab[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 0 0 1px var(--line)}
+.pane{padding:18px;overflow:auto;display:flex;flex-direction:column;gap:16px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field>label,.field>.lbl{font-weight:500;font-size:14px}
+.row{display:flex;gap:10px;align-items:center}
+.row>*{min-width:0}
+.hint{color:var(--muted);font-size:13px;margin:0}
+.hint.warn{color:var(--warn)}
+select,input[type=number],input[type=text]{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 10px;min-height:38px}
+select:hover,input[type=number]:hover,input[type=text]:hover{border-color:var(--muted)}
+input[type=number]{font-variant-numeric:tabular-nums}
+.unit{color:var(--muted);font-size:13.5px;flex:none}
+.times{color:var(--muted);flex:none}
+.range{display:flex;align-items:center;gap:12px}
+.range input[type=range]{flex:1;accent-color:var(--accent)}
+.range output{min-width:36px;text-align:end;font-variant-numeric:tabular-nums;font-weight:600}
+.check{display:flex;gap:10px;align-items:flex-start;cursor:pointer;font-size:14px}
+.check input{margin-top:3px;accent-color:var(--accent);width:16px;height:16px;flex:none}
+input[type=color]{width:44px;height:34px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);padding:2px;cursor:pointer}
+.group{border-top:1px solid var(--line);padding-top:16px;display:flex;flex-direction:column;gap:14px}
+.preset select{font-weight:500}
+.tokens{display:flex;flex-wrap:wrap;gap:6px}
+.token{border:1px solid var(--line);background:var(--surface-2);border-radius:6px;padding:2px 8px;font-size:13px;cursor:pointer}
+.preview-name{background:var(--surface-2);border-radius:var(--r-sm);padding:8px 10px;font-size:13.5px;word-break:break-all;direction:ltr;text-align:left}
+
+/* Work area */
+.work{display:flex;flex-direction:column;gap:14px;min-width:0}
+.drop{display:flex;align-items:center;gap:18px;border:1.5px dashed var(--line);border-radius:var(--r-lg);background:var(--surface);padding:22px 24px;cursor:pointer;transition:border-color .15s,background .15s}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop .ico{flex:none;width:48px;height:48px;border-radius:12px;background:var(--accent-soft);display:grid;place-items:center;color:var(--accent)}
+.drop strong{display:block;font-size:16px;font-weight:600}
+.drop span{color:var(--muted);font-size:13.5px}
+.bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:12px 14px}
+.totals{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:baseline}
+.totals .t{display:flex;flex-direction:column}
+.totals .t b{font-size:17px;font-weight:600;font-variant-numeric:tabular-nums;direction:ltr;unicode-bidi:isolate}
+.totals .t small{color:var(--muted);font-size:12.5px}
+.totals .t.saved b{color:var(--ok)}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+.stale{font-size:13px;color:var(--warn);width:100%}
+
+/* File list */
+.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.item{display:grid;grid-template-columns:56px minmax(0,1fr) minmax(180px,300px) auto;gap:14px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:10px 12px}
+@media (max-width:760px){.item{grid-template-columns:48px minmax(0,1fr) auto}.item .meter{grid-column:1/-1}}
+.thumb{width:56px;height:56px;border-radius:8px;background:var(--surface-2);overflow:hidden;display:grid;place-items:center;color:var(--muted)}
+@media (max-width:760px){.thumb{width:48px;height:48px}.meta{white-space:normal}}
+.thumb img,.thumb video{width:100%;height:100%;object-fit:cover;display:block}
+.info{min-width:0}
+.name{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta{color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.notes{display:flex;flex-direction:column;gap:2px;margin-top:3px}
+.note{font-size:12.5px;color:var(--muted)}
+.note.warn{color:var(--warn)}
+.note.bad{color:var(--bad)}
+.meter{display:flex;flex-direction:column;gap:5px}
+.track{position:relative;height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden;box-shadow:inset 0 0 0 1px var(--line)}
+.fill{position:absolute;inset-block:0;inset-inline-start:0;border-radius:99px;background:var(--ok);width:0;transition:width .25s}
+.fill.work{background:var(--accent)}
+.fill.over{background:var(--bad)}
+.sizes{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;font-variant-numeric:tabular-nums;color:var(--muted)}
+.sizes b{color:var(--ink);font-weight:600}
+.sizes span{unicode-bidi:isolate}
+[dir="rtl"] .totals .t b{text-align:right}
+.pct{font-weight:600}
+.pct.good{color:var(--ok)}
+.pct.bad{color:var(--bad)}
+.ops{display:flex;gap:2px;align-items:center}
+.status{font-size:12.5px;padding:2px 8px;border-radius:99px;background:var(--surface-2);color:var(--muted);white-space:nowrap}
+.status.error{background:var(--bad-soft);color:var(--bad)}
+.empty{text-align:center;color:var(--muted);padding:34px 16px;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface)}
+.empty p{margin:4px 0}
+
+/* Compare dialog */
+dialog{border:0;border-radius:var(--r-lg);padding:0;background:var(--surface);color:var(--ink);width:min(1100px,94vw);max-height:92vh}
+dialog::backdrop{background:rgba(20,12,24,.55)}
+.dlg-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.dlg-head h2{font-size:15px;margin:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dlg-body{padding:16px;overflow:auto;max-height:calc(92vh - 60px)}
+.cmp{position:relative;margin:0 auto;width:fit-content;max-width:100%;user-select:none;background:repeating-conic-gradient(var(--surface-2) 0 25%,transparent 0 50%) 0 0/20px 20px;border-radius:var(--r-sm);overflow:hidden}
+.cmp>img{display:block;max-width:100%;max-height:68vh;width:auto;height:auto}
+.cmp .after{position:absolute;inset:0;clip-path:inset(0 0 0 50%)}
+.cmp .after img{width:100%;height:100%;object-fit:contain}
+.cmp .line{position:absolute;top:0;bottom:0;width:2px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.35);left:50%;pointer-events:none}
+.cmp-labels{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin:10px 0 6px;direction:ltr}
+.cmp-range{width:100%;accent-color:var(--accent);direction:ltr}
+.vids{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:700px){.vids{grid-template-columns:1fr}}
+.vids figure{margin:0}
+.vids video{width:100%;border-radius:var(--r-sm);background:#000}
+.vids figcaption{font-size:13px;color:var(--muted);margin-top:6px}
+
+.foot{max-width:1440px;margin:0 auto;padding:0 24px 28px;color:var(--muted);font-size:12.5px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <svg width="40" height="40" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="var(--accent)"/><path d="M9 22V10l7 7 7-7v12" fill="none" stroke="var(--accent-ink)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div>
+      <h1 data-i18n="appTitle">Muhra Media Compressor</h1>
+      <p data-i18n="appSub">Compress images and videos for Shopify. Files never leave this device.</p>
+    </div>
+  </div>
+  <button class="btn ghost" id="langBtn" type="button" lang="ar">العربية</button>
+</header>
+
+<div class="notices" id="notices">
+  <div class="notice bad" id="fileProtocol" hidden>
+    This page must be opened through a web address (GitHub Pages or a local server), not by double-clicking the file. See README.md.
+    <br>يجب فتح الصفحة من رابط (GitHub Pages أو سيرفر محلي) وليس بالضغط المزدوج على الملف. راجع ملف README.md.
+  </div>
+  <div class="notice bad" id="loadFail" hidden>
+    The app could not start. Check your internet connection and that the vendor folder was uploaded, then reload.
+    <br>تعذّر تشغيل الأداة. تأكد من الاتصال ومن رفع مجلد vendor ثم أعد تحميل الصفحة.
+  </div>
+  <div class="notice warn" id="noVideo" hidden data-i18n="noVideoSupport"></div>
+</div>
+
+<main class="layout">
+  <aside class="panel" aria-label="Settings">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" data-tab="image" aria-selected="true" type="button" data-i18n="tabImages">Images</button>
+      <button class="tab" role="tab" data-tab="video" aria-selected="false" type="button" data-i18n="tabVideos">Videos</button>
+      <button class="tab" role="tab" data-tab="naming" aria-selected="false" type="button" data-i18n="tabNames">File names</button>
+    </div>
+
+    <!-- IMAGE SETTINGS -->
+    <div class="pane" data-pane="image">
+      <div class="field preset">
+        <label for="imagePreset" data-i18n="preset">Preset</label>
+        <select id="imagePreset"></select>
+      </div>
+
+      <div class="group">
+        <div class="field">
+          <label for="imgFormat" data-i18n="format">Output format</label>
+          <select id="imgFormat" data-k="image.format">
+            <option value="webp" data-i18n="fmtWebp">WebP (recommended)</option>
+            <option value="jpeg" data-i18n="fmtJpeg">JPEG</option>
+            <option value="avif" data-i18n="fmtAvif">AVIF</option>
+            <option value="png" data-i18n="fmtPng">PNG (lossless)</option>
+            <option value="original" data-i18n="fmtOriginal">Same as original</option>
+          </select>
+          <p class="hint warn" id="imgFmtWarn" hidden></p>
+        </div>
+        <div class="field" data-show="image.format:!png">
+          <label for="imgQuality" data-i18n="quality">Quality</label>
+          <div class="range"><input id="imgQuality" type="range" min="1" max="100" step="1" data-k="image.quality"><output data-out="image.quality"></output></div>
+          <p class="hint" data-i18n="qualityHint">80–90 looks professional for product photos. Below 70 may show artifacts.</p>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="field">
+          <label for="imgSizeMode" data-i18n="resize">Resize</label>
+          <select id="imgSizeMode" data-k="image.sizeMode">
+            <option value="none" data-i18n="rzNone">Keep original dimensions</option>
+            <option value="long" data-i18n="rzLong">Limit longest side</option>
+            <option value="width" data-i18n="rzWidth">Set width</option>
+            <option value="height" data-i18n="rzHeight">Set height</option>
+            <option value="exact" data-i18n="rzExact">Exact size (width × height)</option>
+          </select>
+        </div>
+        <div class="field" data-show="image.sizeMode:long">
+          <label for="imgMaxLong" data-i18n="longSide">Longest side</label>
+          <div class="row"><input id="imgMaxLong" type="number" min="16" max="10000" step="1" data-k="image.maxLong"><span class="unit">px</span></div>
+        </div>
+        <div class="field" data-show="image.sizeMode:width">
+          <label for="imgWidth" data-i18n="width">Width</label>
+          <div class="row"><input id="imgWidth" type="number" min="16" max="10000" step="1" data-k="image.width"><span class="unit">px</span></div>
+        </div>
+        <div class="field" data-show="image.sizeMode:height">
+          <label for="imgHeight" data-i18n="height">Height</label>
+          <div class="row"><input id="imgHeight" type="number" min="16" max="10000" step="1" data-k="image.height"><span class="unit">px</span></div>
+        </div>
+        <div class="field" data-show="image.sizeMode:exact">
+          <span class="lbl" data-i18n="dimensions">Dimensions</span>
+          <div class="row"><input type="number" min="16" max="10000" step="1" data-k="image.exactW" aria-label="Width"><span class="times">×</span><input type="number" min="16" max="10000" step="1" data-k="image.exactH" aria-label="Height"><span class="unit">px</span></div>
+          <select data-k="image.fit" aria-label="Fit">
+            <option value="cover" data-i18n="fitCover">Fill and crop edges (no bars)</option>
+            <option value="contain" data-i18n="fitContain">Fit whole image (add background)</option>
+          </select>
+        </div>
+        <label class="check" data-show="image.sizeMode:long,width,height"><input type="checkbox" data-k="image.noUpscale"><span data-i18n="noUpscale">Never enlarge smaller images</span></label>
+      </div>
+
+      <div class="group" data-show="image.format:!png">
+        <div class="field">
+          <label for="imgTarget" data-i18n="targetKB">Maximum file size</label>
+          <div class="row"><input id="imgTarget" type="number" min="0" max="20000" step="10" data-k="image.targetKB"><span class="unit">KB</span></div>
+          <p class="hint" data-i18n="targetKBHint">0 = off. When set, quality is lowered only as much as needed to fit.</p>
+        </div>
+        <div class="field" data-show="image.targetKB:>0">
+          <label for="imgMinQ" data-i18n="minQuality">Never go below quality</label>
+          <div class="range"><input id="imgMinQ" type="range" min="1" max="100" step="1" data-k="image.minQuality"><output data-out="image.minQuality"></output></div>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="field">
+          <label for="imgSharpen" data-i18n="sharpen">Sharpen after resize</label>
+          <div class="range"><input id="imgSharpen" type="range" min="0" max="100" step="1" data-k="image.sharpen"><output data-out="image.sharpen"></output></div>
+          <p class="hint" data-i18n="sharpenHint">10–25 restores crispness to fabric detail after downsizing. 0 = off.</p>
+        </div>
+        <div class="field">
+          <span class="lbl" data-i18n="background">Background color</span>
+          <div class="row"><input type="color" data-k="image.bg" aria-label="Background color"><p class="hint" data-i18n="bgHint">Used for JPEG and for padding in “Fit whole image”.</p></div>
+        </div>
+        <label class="check" data-show="image.format:!jpeg"><input type="checkbox" data-k="image.transparent"><span data-i18n="keepTransparent">Keep transparency (WebP, PNG, AVIF)</span></label>
+        <label class="check"><input type="checkbox" data-k="image.keepIfLarger"><span data-i18n="keepIfLarger">If the result is bigger than the original, keep the original</span></label>
+      </div>
+      <p class="hint" data-i18n="imgShopifyHint">Shopify accepts images up to 20 MB and 5000 × 5000 px, and serves them to shoppers in modern formats automatically. 2048 px is the sweet spot for product photos.</p>
+    </div>
+
+    <!-- VIDEO SETTINGS -->
+    <div class="pane" data-pane="video" hidden>
+      <div class="field preset">
+        <label for="videoPreset" data-i18n="preset">Preset</label>
+        <select id="videoPreset"></select>
+      </div>
+
+      <div class="group">
+        <div class="row">
+          <div class="field" style="flex:1">
+            <label for="vContainer" data-i18n="container">File type</label>
+            <select id="vContainer" data-k="video.container">
+              <option value="mp4">MP4</option>
+              <option value="webm">WebM</option>
+            </select>
+          </div>
+          <div class="field" style="flex:1.4">
+            <label for="vCodec" data-i18n="codec">Codec</label>
+            <select id="vCodec" data-k="video.codec">
+              <option value="avc" data-i18n="cAvc">H.264 (most compatible)</option>
+              <option value="hevc" data-i18n="cHevc">H.265 / HEVC</option>
+              <option value="vp9" data-i18n="cVp9">VP9</option>
+              <option value="av1" data-i18n="cAv1">AV1</option>
+            </select>
+          </div>
+        </div>
+        <p class="hint warn" id="vCodecWarn" hidden></p>
+        <p class="hint" data-i18n="codecHint">For Shopify product videos use MP4 + H.264. Shopify re-streams uploads at 480p–1080p.</p>
+      </div>
+
+      <div class="group">
+        <div class="field">
+          <label for="vRate" data-i18n="rateMode">Compression control</label>
+          <select id="vRate" data-k="video.rateMode">
+            <option value="bitrate" data-i18n="rmBitrate">Bitrate (predictable quality)</option>
+            <option value="quality" data-i18n="rmQuality">Quality level</option>
+            <option value="size" data-i18n="rmSize">Target file size</option>
+          </select>
+        </div>
+        <div class="field" data-show="video.rateMode:bitrate">
+          <label for="vBitrate" data-i18n="bitrate">Video bitrate</label>
+          <div class="row"><input id="vBitrate" type="number" min="0.2" max="60" step="0.1" data-k="video.bitrateMbps"><span class="unit">Mbps</span></div>
+          <p class="hint" data-i18n="bitrateHint">1080p: 4–6 Mbps looks sharp. 720p: 2–3 Mbps. Vertical 1080×1920: 5–7 Mbps.</p>
+        </div>
+        <div class="field" data-show="video.rateMode:quality">
+          <label for="vQuality" data-i18n="quality">Quality</label>
+          <div class="range"><input id="vQuality" type="range" min="1" max="100" step="1" data-k="video.quality"><output data-out="video.quality"></output></div>
+          <p class="hint" data-i18n="vQualityHint">File size varies with the content. 70–85 is a good range.</p>
+        </div>
+        <div class="field" data-show="video.rateMode:size">
+          <label for="vTarget" data-i18n="targetMB">Target size per video</label>
+          <div class="row"><input id="vTarget" type="number" min="1" max="1000" step="1" data-k="video.targetMB"><span class="unit">MB</span></div>
+          <p class="hint" data-i18n="targetMBHint">The bitrate is calculated from each video's length. Results land within a few percent.</p>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="field">
+          <label for="vSizeMode" data-i18n="resize">Resize</label>
+          <select id="vSizeMode" data-k="video.sizeMode">
+            <option value="none" data-i18n="rzNone">Keep original dimensions</option>
+            <option value="long" data-i18n="rzLong">Limit longest side</option>
+            <option value="exact" data-i18n="rzExact">Exact size (width × height)</option>
+          </select>
+        </div>
+        <div class="field" data-show="video.sizeMode:long">
+          <label for="vMaxLong" data-i18n="longSide">Longest side</label>
+          <select id="vMaxLong" data-k="video.maxLong" data-num>
+            <option value="3840">3840 px (4K)</option>
+            <option value="2560">2560 px (1440p)</option>
+            <option value="1920">1920 px (1080p)</option>
+            <option value="1280">1280 px (720p)</option>
+            <option value="960">960 px (540p)</option>
+            <option value="854">854 px (480p)</option>
+          </select>
+        </div>
+        <div class="field" data-show="video.sizeMode:exact">
+          <span class="lbl" data-i18n="dimensions">Dimensions</span>
+          <div class="row"><input type="number" min="16" max="4096" step="2" data-k="video.exactW" aria-label="Width"><span class="times">×</span><input type="number" min="16" max="4096" step="2" data-k="video.exactH" aria-label="Height"><span class="unit">px</span></div>
+          <select data-k="video.fit" aria-label="Fit">
+            <option value="cover" data-i18n="fitCoverV">Fill and crop edges (no bars)</option>
+            <option value="contain" data-i18n="fitContainV">Fit whole video (black bars)</option>
+          </select>
+        </div>
+        <label class="check" data-show="video.sizeMode:long"><input type="checkbox" data-k="video.noUpscale"><span data-i18n="noUpscaleV">Never enlarge smaller videos</span></label>
+        <div class="field">
+          <label for="vFps" data-i18n="fps">Frame rate</label>
+          <select id="vFps" data-k="video.fps" data-num>
+            <option value="0" data-i18n="fpsKeep">Keep original</option>
+            <option value="60" data-i18n="fps60">Max 60 fps</option>
+            <option value="30" data-i18n="fps30">Max 30 fps</option>
+            <option value="25" data-i18n="fps25">Max 25 fps</option>
+            <option value="24" data-i18n="fps24">Max 24 fps</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="field">
+          <label for="vAudio" data-i18n="audio">Audio</label>
+          <select id="vAudio" data-k="video.audio">
+            <option value="reencode" data-i18n="auRe">Compress audio</option>
+            <option value="keep" data-i18n="auKeep">Keep original audio</option>
+            <option value="remove" data-i18n="auRemove">Remove audio</option>
+          </select>
+        </div>
+        <div class="field" data-show="video.audio:reencode">
+          <label for="vAudioKbps" data-i18n="audioBitrate">Audio bitrate</label>
+          <select id="vAudioKbps" data-k="video.audioKbps" data-num>
+            <option value="64">64 kbps</option>
+            <option value="96">96 kbps</option>
+            <option value="128">128 kbps</option>
+            <option value="160">160 kbps</option>
+            <option value="192">192 kbps</option>
+          </select>
+        </div>
+        <label class="check"><input type="checkbox" data-k="video.keepIfLarger"><span data-i18n="keepIfLarger">If the result is bigger than the original, keep the original</span></label>
+      </div>
+      <p class="hint" data-i18n="vidShopifyHint">Shopify accepts videos up to 1 GB, 10 minutes and 4K. Videos are processed one at a time; keep this tab open.</p>
+    </div>
+
+    <!-- NAMING -->
+    <div class="pane" data-pane="naming" hidden>
+      <div class="field">
+        <label for="namePattern" data-i18n="namePattern">File name pattern</label>
+        <input id="namePattern" type="text" data-k="naming.pattern" spellcheck="false" dir="ltr">
+        <div class="tokens" id="tokens">
+          <button type="button" class="token" data-token="{name}">{name}</button>
+          <button type="button" class="token" data-token="{w}">{w}</button>
+          <button type="button" class="token" data-token="{h}">{h}</button>
+          <button type="button" class="token" data-token="{n}">{n}</button>
+        </div>
+        <p class="hint" data-i18n="tokensHint">{name} original name, {w} width, {h} height, {n} position in the list. The extension is added automatically.</p>
+      </div>
+      <label class="check"><input type="checkbox" data-k="naming.clean"><span data-i18n="cleanNames">Clean names for Shopify (lowercase, hyphens instead of spaces, no symbols)</span></label>
+      <div class="field">
+        <span class="lbl" data-i18n="example">Example</span>
+        <div class="preview-name" id="namePreview"></div>
+      </div>
+    </div>
+  </aside>
+
+  <section class="work" aria-label="Files">
+    <label class="drop" id="drop">
+      <input type="file" id="fileInput" multiple accept="image/*,video/*,.heic,.heif,.mov,.mkv" hidden>
+      <div class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M6 10l6-6 6 6"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg></div>
+      <div><strong data-i18n="dropTitle">Drop images and videos here</strong><span data-i18n="dropSub">or click to choose files. JPG, PNG, WebP, AVIF, GIF, MP4, MOV, WebM.</span></div>
+    </label>
+
+    <div class="bar" id="bar" hidden>
+      <div class="totals">
+        <div class="t"><b id="tCount">0</b><small data-i18n="tFiles">files</small></div>
+        <div class="t"><b id="tOrig">0 KB</b><small data-i18n="tBefore">before</small></div>
+        <div class="t"><b id="tOut">–</b><small data-i18n="tAfter">after</small></div>
+        <div class="t saved"><b id="tSaved">–</b><small data-i18n="tSaved">saved</small></div>
+      </div>
+      <div class="actions">
+        <button class="btn primary" id="runBtn" type="button" data-i18n="compress">Compress</button>
+        <button class="btn" id="stopBtn" type="button" hidden data-i18n="stop">Stop</button>
+        <button class="btn" id="zipBtn" type="button" disabled data-i18n="downloadZip">Download all (ZIP)</button>
+        <button class="btn" id="folderBtn" type="button" disabled hidden data-i18n="saveFolder">Save to folder</button>
+        <button class="btn ghost" id="clearBtn" type="button" data-i18n="clear">Clear list</button>
+      </div>
+      <p class="stale" id="stale" hidden data-i18n="stale">Settings changed. Press Compress to apply them to all files.</p>
+    </div>
+
+    <ul class="list" id="list"></ul>
+    <div class="empty" id="empty">
+      <p data-i18n="emptyTitle">No files yet.</p>
+      <p class="hint" data-i18n="emptySub">Choose a preset, add your files, then press Compress.</p>
+    </div>
+  </section>
+</main>
+
+<p class="foot" data-i18n="foot">All processing happens in your browser. Best in Chrome or Edge on a computer.</p>
+
+<dialog id="cmpDlg">
+  <div class="dlg-head"><h2 id="cmpTitle"></h2><button class="icon-btn" id="cmpClose" type="button" aria-label="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <div class="dlg-body" id="cmpBody"></div>
+</dialog>
+
+<script>
+  // Runs before the app module: explain file:// and module-load failures clearly.
+  if (location.protocol === 'file:') document.getElementById('fileProtocol').hidden = false;
+  window.__appStarted = false;
+  setTimeout(function(){ if(!window.__appStarted && location.protocol !== 'file:') document.getElementById('loadFail').hidden = false; }, 8000);
+</script>
+<script type="module" src="./app.js"></script>
+</body>
+</html>
