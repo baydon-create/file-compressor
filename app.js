@@ -3,8 +3,13 @@
  * Everything runs in the browser. No file is uploaded anywhere.
  * Images: Canvas (resize + encode). Videos: Mediabunny (WebCodecs, hardware accelerated).
  */
-import * as MB from './vendor/mediabunny.min.mjs';
-import { zipSync } from './vendor/fflate.mjs';
+// Libraries load from the local vendor/ folder first; if it is missing, a pinned CDN copy is used instead.
+async function loadLib(localPath, cdnUrl) {
+  try { return await import(localPath); }
+  catch (e) { console.warn(`Local ${localPath} unavailable, loading from CDN.`); return await import(cdnUrl); }
+}
+const MB = await loadLib('./vendor/mediabunny.min.mjs', 'https://cdn.jsdelivr.net/npm/mediabunny@1.59.1/dist/bundles/mediabunny.min.mjs');
+const { zipSync } = await loadLib('./vendor/fflate.mjs', 'https://cdn.jsdelivr.net/npm/fflate@0.8.3/esm/browser.js');
 
 /* =====================================================================
    TEAM PRESETS — edit these to standardise output for everyone.
@@ -1223,6 +1228,7 @@ function bindInput() {
 /* ------------------------------ boot --------------------------------- */
 async function boot() {
   window.__appStarted = true;
+  document.getElementById('loadFail').hidden = true;
   bindTabs();
   bindSettings();
   bindInput();
