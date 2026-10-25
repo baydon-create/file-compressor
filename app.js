@@ -1,5 +1,5 @@
 /*
- * Muhra Media Compressor
+ * Media Compressor
  * Everything runs in the browser. No file is uploaded anywhere.
  * Images: Canvas (resize + encode). Videos: Mediabunny (WebCodecs, hardware accelerated).
  */
@@ -57,14 +57,26 @@ const DEFAULTS = {
 
 /* ===================================================================== */
 
-const STORE_KEY = 'muhra-media-compressor:v1';
-const LANG_KEY = 'muhra-media-compressor:lang';
+const STORE_KEY = 'media-compressor:v1';
+const LANG_KEY = 'media-compressor:lang';
+// Carry over settings saved under the previous storage keys.
+try {
+  for (const [from, to] of [['muhra-media-compressor:v1', STORE_KEY], ['muhra-media-compressor:lang', LANG_KEY]]) {
+    const old = localStorage.getItem(from);
+    if (old !== null && localStorage.getItem(to) === null) localStorage.setItem(to, old);
+    localStorage.removeItem(from);
+  }
+} catch {}
 const SHOPIFY = { imgBytes: 20 * 1024 * 1024, imgSide: 5000, imgMP: 25e6, vidBytes: 1024 ** 3, vidSeconds: 600, vidLong: 4096, vidShort: 2160 };
 
 /* ------------------------------ i18n --------------------------------- */
 const T = {
   en: {
-    appTitle: 'Muhra Media Compressor',
+    appTitle: 'Media Compressor',
+    badgeLocal: 'On-device processing',
+    grpOutput: 'Output', grpDimensions: 'Dimensions', grpSizeLimit: 'File size limit', grpFinishing: 'Finishing',
+    grpEncoding: 'Encoding', grpCompression: 'Compression', grpFrame: 'Resolution and frame rate', grpAudio: 'Audio',
+    queueTitle: 'Files',
     appSub: 'Compress images and videos for Shopify. Files never leave this device.',
     noVideoSupport: 'This browser cannot compress video. Use the latest Chrome or Edge on a computer. Image compression still works.',
     tabImages: 'Images', tabVideos: 'Videos', tabNames: 'File names',
@@ -100,7 +112,7 @@ const T = {
     namePattern: 'File name pattern',
     tokensHint: '{name} original name, {w} width, {h} height, {n} position in the list. The extension is added automatically.',
     cleanNames: 'Clean names for Shopify (lowercase, hyphens instead of spaces, no symbols)', example: 'Example',
-    dropTitle: 'Drop images and videos here', dropSub: 'or click to choose files. JPG, PNG, WebP, AVIF, GIF, MP4, MOV, WebM.',
+    dropTitle: 'Drop images and videos here', dropSub: 'or click to choose files from your device',
     tFiles: 'files', tBefore: 'before', tAfter: 'after', tSaved: 'saved',
     compress: 'Compress', compressN: 'Compress {n} files', compressAgain: 'Compress again', stop: 'Stop',
     downloadZip: 'Download all (ZIP)', saveFolder: 'Save to folder', clear: 'Clear list',
@@ -145,7 +157,11 @@ const T = {
     busyLeave: 'Files are still being processed. Leave anyway?',
   },
   ar: {
-    appTitle: 'ضاغط الوسائط – مُهرة',
+    appTitle: 'ضاغط الوسائط',
+    badgeLocal: 'معالجة على جهازك',
+    grpOutput: 'الناتج', grpDimensions: 'الأبعاد', grpSizeLimit: 'حد حجم الملف', grpFinishing: 'اللمسات النهائية',
+    grpEncoding: 'الترميز', grpCompression: 'الضغط', grpFrame: 'الدقة ومعدل الإطارات', grpAudio: 'الصوت',
+    queueTitle: 'الملفات',
     appSub: 'ضغط الصور والفيديوهات لمتجر شوبيفاي. الملفات لا تغادر جهازك.',
     noVideoSupport: 'هذا المتصفح لا يدعم ضغط الفيديو. استخدم أحدث إصدار من Chrome أو Edge على الكمبيوتر. ضغط الصور يعمل بشكل طبيعي.',
     tabImages: 'الصور', tabVideos: 'الفيديو', tabNames: 'أسماء الملفات',
@@ -181,7 +197,7 @@ const T = {
     namePattern: 'نمط اسم الملف',
     tokensHint: '{name} الاسم الأصلي، {w} العرض، {h} الارتفاع، {n} ترتيب الملف في القائمة. الامتداد يُضاف تلقائيًا.',
     cleanNames: 'تنظيف الأسماء لشوبيفاي (حروف صغيرة، شرطة بدل المسافات، بدون رموز)', example: 'مثال',
-    dropTitle: 'اسحب الصور والفيديوهات إلى هنا', dropSub: 'أو اضغط لاختيار الملفات. JPG وPNG وWebP وAVIF وGIF وMP4 وMOV وWebM.',
+    dropTitle: 'اسحب الصور والفيديوهات إلى هنا', dropSub: 'أو اضغط لاختيار الملفات من جهازك',
     tFiles: 'ملفات', tBefore: 'قبل', tAfter: 'بعد', tSaved: 'توفير',
     compress: 'ابدأ الضغط', compressN: 'ضغط {n} ملف', compressAgain: 'إعادة الضغط', stop: 'إيقاف',
     downloadZip: 'تنزيل الكل (ZIP)', saveFolder: 'حفظ في مجلد', clear: 'مسح القائمة',
@@ -990,7 +1006,7 @@ async function saveToFolder() {
   const entries = outputEntries();
   if (!entries.length) return;
   let dir;
-  try { dir = await window.showDirectoryPicker({ mode: 'readwrite', id: 'muhra-compressed' }); }
+  try { dir = await window.showDirectoryPicker({ mode: 'readwrite', id: 'compressed-media' }); }
   catch { return; }
   const btn = $('#folderBtn'); const label = btn.textContent;
   btn.disabled = true; btn.textContent = t('saving');
@@ -1239,6 +1255,6 @@ async function boot() {
   applyLang();
   updateSummary();
   // Expose a tiny read-only hook for diagnostics in the console.
-  window.muhraCompressor = { caps, items, settings: () => settings };
+  window.mediaCompressor = { caps, items, settings: () => settings };
 }
 boot();

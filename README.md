@@ -1,4 +1,4 @@
-# Muhra Media Compressor
+# Media Compressor
 
 Bulk image and video compression for the Shopify team. Everything runs inside the browser on each team member's device. No file is uploaded anywhere.
 
@@ -50,7 +50,7 @@ Photo orientation from phone cameras is applied automatically and metadata (incl
 
 ---
 
-# ضاغط الوسائط – مُهرة
+# ضاغط الوسائط
 
 أداة لضغط الصور والفيديوهات بالجملة لفريق متجر شوبيفاي. كل المعالجة تتم داخل المتصفح على جهاز كل عضو في الفريق، ولا يتم رفع أي ملف لأي مكان.
 
