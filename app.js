@@ -146,6 +146,8 @@ const T = {
     noteFmtFallback: 'Saved as JPEG: this browser cannot create {fmt}.',
     noteToJpeg: 'Original format cannot be written by the browser; saved as JPEG.',
     noteAudioDropped: 'Audio was removed: it could not be processed in this browser.',
+    noteAudioCopied: 'Audio copied unchanged: this browser could not decode it for re-compression.',
+    noteFitsTarget: 'Original kept: it is already under the target size.',
     noteOpus: 'Audio saved as Opus (AAC is not available in this browser). Use Chrome or Edge for AAC.',
     noteVidTarget: 'The file is a little over the target size.',
     noteShopifyImg: 'Above Shopify\u2019s image limit (20 MB / 5000 px). Lower the size.',
@@ -231,6 +233,8 @@ const T = {
     noteFmtFallback: 'تم الحفظ بصيغة JPEG لأن المتصفح لا يدعم إنشاء {fmt}.',
     noteToJpeg: 'المتصفح لا يستطيع الكتابة بصيغة الأصل، تم الحفظ بصيغة JPEG.',
     noteAudioDropped: 'تم حذف الصوت لأنه لا يمكن معالجته في هذا المتصفح.',
+    noteAudioCopied: 'تم نسخ الصوت كما هو لأن المتصفح لم يستطع فك ترميزه لإعادة ضغطه.',
+    noteFitsTarget: 'تم الاحتفاظ بالأصل لأنه أصغر من الحجم المطلوب بالفعل.',
     noteOpus: 'تم حفظ الصوت بترميز Opus لأن AAC غير متاح في هذا المتصفح. استخدم Chrome أو Edge للحصول على AAC.',
     noteVidTarget: 'الملف أكبر قليلًا من الحجم المطلوب.',
     noteShopifyImg: 'أكبر من حد شوبيفاي للصور (20 ميجا / 5000 بكسل). قلّل المقاس.',
@@ -567,7 +571,9 @@ async function probeVideo(file) {
     const at = await input.getPrimaryAudioTrack().catch(() => null);
     let audio = null;
     if (at) {
-      audio = { ch: 2, sr: 48000, bps: 0 };
+      audio = { ch: 2, sr: 48000, bps: 0, codec: null, canDecode: true };
+      try { audio.codec = await at.getCodec(); } catch {}
+      try { audio.canDecode = await at.canDecode(); } catch { audio.canDecode = false; }
       try { audio.ch = await at.getNumberOfChannels(); } catch {}
       try { audio.sr = await at.getSampleRate(); } catch {}
       try { audio.bps = (await at.computePacketStats(200)).averageBitrate || 0; } catch {}
@@ -638,57 +644,99 @@ async function processVideo(item, S) {
     if (info.srcFps) notes.push({ t: 'info', k: 'noteFps', v: { fps: S.fps } });
   }
 
-  let audio, audioBps = 0;
-  if (info.audio) {
-    if (S.audio === 'remove') audio = { discard: true };
-    else if (S.audio === 'keep') { audio = {}; audioBps = info.audio.bps || 160000; }
-    else {
-      const ac = S.container === 'webm' ? (caps.opus ? 'opus' : null) : (caps.aac ? 'aac' : caps.opus ? 'opus' : null);
-      if (!ac) { audio = { discard: true }; notes.push({ t: 'warn', k: 'noteAudioDropped' }); }
-      else {
-        if (S.container === 'mp4' && ac === 'opus') notes.push({ t: 'warn', k: 'noteOpus' });
-        const ch = Math.max(1, Math.min(2, info.audio.ch || 2));
-        const sr = ac === 'opus' ? 48000 : ([44100, 48000].includes(info.audio.sr) ? info.audio.sr : 48000);
-        audio = { codec: ac, quality: new MB.Quality({ bitrate: S.audioKbps * 1000 }), numberOfChannels: ch, sampleRate: sr, forceTranscode: true };
-        audioBps = S.audioKbps * 1000;
-      }
-    }
+  const mime = S.container === 'webm' ? 'video/webm' : 'video/mp4';
+  const srcType = item.file.type || mimeFromName(item.file.name);
+  const targetBytes = S.targetMB * 1024 * 1024;
+  const dur = info.duration;
+  if (S.rateMode === 'size' && (!dur || !isFinite(dur))) throw new AppError('errDuration');
+
+  // Target size already met: re-encoding can only lose quality (and needlessly decodes the audio).
+  if (S.rateMode === 'size' && S.keepIfLarger && item.file.size <= targetBytes && srcType === mime
+      && plan.w === even(info.sw) && plan.h === even(info.sh) && !frameRate) {
+    return { blob: item.file, ext: (item.file.name.split('.').pop() || 'mp4').toLowerCase(), w: info.sw, h: info.sh,
+      kept: true, notes: [{ t: 'info', k: 'noteFitsTarget' }], mime: srcType };
   }
 
-  const targetBytes = S.targetMB * 1024 * 1024;
-  let vbps = 0;
-  if (S.rateMode === 'size') {
-    if (!info.duration || !isFinite(info.duration)) throw new AppError('errDuration');
-    const overhead = 0.03; // container overhead
-    vbps = Math.floor((targetBytes * 8 * (1 - overhead)) / info.duration - audioBps);
-    vbps = Math.min(vbps, 60e6);
-    if (vbps < 150000) {
-      const minBytes = ((150000 + audioBps) * info.duration) / 8 / (1 - overhead);
+  // Audio modes, tried in order. Some browsers (notably Safari: "InternalAudioDecoderCocoa decoding failed")
+  // report they can decode a track and then fail mid-way, so fall back to copying the audio untouched, then to no audio.
+  const copyable = !!info.audio && (S.container === 'webm'
+    ? ['opus', 'vorbis'].includes(info.audio.codec)
+    : ['aac', 'mp3', 'opus', 'flac', 'ac3', 'eac3'].includes(info.audio.codec));
+  let audioModes;
+  if (!info.audio || S.audio === 'remove') audioModes = ['remove'];
+  else if (S.audio === 'keep') audioModes = ['keep', 'drop'];
+  else audioModes = [...(info.audio.canDecode ? ['reencode'] : []), ...(copyable ? ['keep'] : []), 'drop'];
+
+  const audioFor = (mode) => {
+    if (mode === 'remove' || mode === 'drop') return { audio: info.audio ? { discard: true } : undefined, bps: 0 };
+    if (mode === 'keep') return { audio: {}, bps: info.audio.bps || 160000 };
+    const ac = S.container === 'webm' ? (caps.opus ? 'opus' : null) : (caps.aac ? 'aac' : caps.opus ? 'opus' : null);
+    if (!ac) return null;
+    const ch = Math.max(1, Math.min(2, info.audio.ch || 2));
+    const sr = ac === 'opus' ? 48000 : ([44100, 48000].includes(info.audio.sr) ? info.audio.sr : 48000);
+    return { codec: ac, audio: { codec: ac, quality: new MB.Quality({ bitrate: S.audioKbps * 1000 }), numberOfChannels: ch, sampleRate: sr, forceTranscode: true },
+      bps: S.audioKbps * 1000 };
+  };
+
+  const MIN_VBPS = 150000, OVERHEAD = 0.03;
+  // Video bitrate that makes video + audio + container overhead fit the target.
+  const budgetVbps = (audioBps) => Math.floor((targetBytes * 8 * (1 - OVERHEAD)) / dur - audioBps);
+  const sizeVbps = (audioBps) => {
+    let v = Math.min(budgetVbps(audioBps), 60e6);
+    if (v < MIN_VBPS) {
+      const minBytes = ((MIN_VBPS + audioBps) * dur) / 8 / (1 - OVERHEAD);
       throw new AppError('errTargetTooSmall', { min: fmtBytes(Math.ceil(minBytes)) });
     }
-  }
+    // Never spend more bits than the source has: a target above the original size would otherwise inflate the file.
+    const srcVbps = (item.file.size * 8) / dur - (info.audio ? info.audio.bps || 0 : 0);
+    const pixelRatio = Math.min(1, (plan.w * plan.h) / (info.sw * info.sh));
+    if (srcVbps > 0) v = Math.min(v, Math.max(MIN_VBPS, Math.floor(srcVbps * pixelRatio)));
+    return v;
+  };
+
+  let buf, pass = 0, modeIdx = 0, a = null;
+  for (; modeIdx < audioModes.length; modeIdx++) { a = audioFor(audioModes[modeIdx]); if (a) break; }
+  if (audioModes[modeIdx] === 'drop' && S.audio !== 'remove') notes.push({ t: 'warn', k: 'noteAudioDropped' });
+  if (audioModes[modeIdx] === 'keep' && S.audio === 'reencode') notes.push({ t: 'warn', k: 'noteAudioCopied' });
+  if (a.codec === 'opus' && S.container === 'mp4') notes.push({ t: 'warn', k: 'noteOpus' });
+  let vbps = S.rateMode === 'size' ? sizeVbps(a.bps) : 0;
+
   const makeQuality = () => {
     if (S.rateMode === 'quality') return new MB.Quality({ quality: S.quality / 100 });
     if (S.rateMode === 'bitrate') return new MB.Quality({ bitrate: Math.round(S.bitrateMbps * 1e6) });
     return new MB.Quality({ bitrate: vbps });
   };
 
-  let buf, pass = 0;
   for (;;) {
-    buf = await runConversion(item, { plan, codec, frameRate, audio, quality: makeQuality(), container: S.container }, notes, pass);
-    if (S.rateMode !== 'size' || buf.byteLength <= targetBytes * 1.02 || pass >= 3) break;
-    const next = Math.floor(vbps * (targetBytes / buf.byteLength) * 0.93);
-    if (next < 150000) break;
+    try {
+      buf = await runConversion(item, { plan, codec, frameRate, audio: a.audio, quality: makeQuality(), container: S.container }, notes, pass);
+    } catch (e) {
+      const why = e instanceof AppError && e.key === 'errConv' ? String(e.vars?.why || '') : '';
+      const audioFailed = /audio/i.test(why) && audioModes[modeIdx] !== 'drop' && audioModes[modeIdx] !== 'remove';
+      if (!audioFailed) throw e;
+      console.warn(`${item.file.name}: audio ${audioModes[modeIdx]} failed (${why}); trying next audio mode.`);
+      for (const k of ['noteAudioCopied', 'noteOpus']) { const i = notes.findIndex((n) => n.k === k); if (i >= 0) notes.splice(i, 1); }
+      modeIdx++;
+      a = audioFor(audioModes[modeIdx]);
+      notes.push({ t: 'warn', k: audioModes[modeIdx] === 'keep' ? 'noteAudioCopied' : 'noteAudioDropped' });
+      if (S.rateMode === 'size') vbps = sizeVbps(a.bps);
+      pass = 0; item.progress = 0; scheduleRowUpdate(item);
+      continue;
+    }
+    // The target is a maximum: retry with a corrected bitrate until the file fits.
+    if (S.rateMode !== 'size' || buf.byteLength <= targetBytes || pass >= 3) break;
+    const actualVbps = (buf.byteLength * 8 * (1 - OVERHEAD)) / dur - a.bps;
+    const ratio = actualVbps > 0 ? budgetVbps(a.bps) / actualVbps : targetBytes / buf.byteLength;
+    const next = Math.floor(vbps * Math.min(ratio, targetBytes / buf.byteLength) * 0.95);
+    if (next < MIN_VBPS) break;
     vbps = next; pass++;
     item.progress = 0; scheduleRowUpdate(item);
   }
-  if (S.rateMode === 'size' && buf.byteLength > targetBytes * 1.02) notes.push({ t: 'warn', k: 'noteVidTarget' });
+  if (S.rateMode === 'size' && buf.byteLength > targetBytes) notes.push({ t: 'warn', k: 'noteVidTarget' });
 
-  const mime = S.container === 'webm' ? 'video/webm' : 'video/mp4';
   let blob = new Blob([buf], { type: mime });
   let ext = S.container === 'webm' ? 'webm' : 'mp4';
   let w = plan.w, h = plan.h, kept = false;
-  const srcType = item.file.type || mimeFromName(item.file.name);
   if (blob.size >= item.file.size) {
     if (S.keepIfLarger && srcType === mime) {
       blob = item.file; kept = true; w = info.sw; h = info.sh;
